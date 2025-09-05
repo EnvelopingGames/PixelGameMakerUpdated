@@ -78,7 +78,7 @@ ipcMain.handle("modules:addViaPicker", async () => {
   const dst = path.join(MODULES_DIR, id);
   try {
     await fsp.copyFile(src, dst);
-    return { ok: true, id };
+    return { ok: true, id, url: pathToFileURL(dst).toString() };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
