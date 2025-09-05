@@ -1,6 +1,6 @@
 /**
- * PixelGameMaker – preload.js (v0.5.1+ patched)
- * Exposes Assets, Modules, and minimal UpdateAPI to the renderer.
+ * PixelGameMaker – preload.js (v0.5.1 patched)
+ * Exposes Assets, Modules, and minimal UpdateAPI to the renderer expected by index.html.
  */
 const { contextBridge, ipcRenderer } = require("electron");
 const invoke = (ch, ...args) => ipcRenderer.invoke(ch, ...args);
@@ -42,7 +42,7 @@ const Updates = {
   clear: () => invoke("updates:clear"),
 };
 
-// Unified APIs expected by index.html
+// Unified API expected by index.html
 const AppAPI = {
   // Assets
   assetsOpenFolder: () => Assets.openFolder(),
@@ -66,7 +66,7 @@ const AppAPI = {
   resolveModuleUrl: (id) => Modules.resolveUrl(id),
   removeModule: (id) => Modules.remove(id),
   openModulesFolder: () => Modules.openFolder(),
-  // Updates passthroughs used by modal buttons
+  // Updates passthroughs
   importUpdateZip: () => Updates.importZip(),
   clearUpdate: () => Updates.clear(),
   // Escape hatch
@@ -75,7 +75,7 @@ const AppAPI = {
 
 contextBridge.exposeInMainWorld("AppAPI", AppAPI);
 contextBridge.exposeInMainWorld("UpdateAPI", Updates);
-// Optional shims for older code
+// Optional shims for any legacy references
 contextBridge.exposeInMainWorld("assets", Assets);
 contextBridge.exposeInMainWorld("modules", Modules);
 contextBridge.exposeInMainWorld("ipc", { invoke });
