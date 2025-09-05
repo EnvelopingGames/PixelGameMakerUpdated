@@ -22,67 +22,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # removed "cache: npm" because no package-lock.json exists
 
       - name: Show environment info
         run: |
           node -v
-          npm -v
-          git rev-parse --short HEAD
-
-      - name: Verify required files exist
-        shell: pwsh
-        run: |
-          $required = @("package.json","main.js","preload.js","index.html")
-          foreach ($f in $required) {
-            if (-not (Test-Path $f)) {
-              Write-Error "Missing required file: $f"
-            }
-          }
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Cache Electron caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~\AppData\Local\electron\Cache
-            ~\AppData\Local\electron-builder\Cache
-          key: ${{ runner.os }}-electron-cache-${{ hashFiles('package-lock.json', 'package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-electron-cache-
-
-      - name: Build Windows portable EXE
-        run: npm run build:win
-
-      - name: List dist folder
-        if: always()
-        run: dir dist
-
-      - name: Read version from package.json
-        id: pkg
-        shell: pwsh
-        run: |
-          $json = Get-Content package.json | ConvertFrom-Json
-          echo "version=$($json.version)" >> $env:GITHUB_OUTPUT
-          echo "name=$($json.name)" >> $env:GITHUB_OUTPUT
-
-      - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.pkg.outputs.name }}-portable-${{ steps.pkg.outputs.version }}-${{ github.ref_name }}-${{ github.run_number }}
-          path: |
-            dist/*.exe
-            dist/*.yml
-          if-no-files-found: error
-
-      - name: Upload build logs (if present)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-${{ github.ref_name }}-${{ github.run_number }}
-          path: |
-            *.log
-            dist/*.log
-          if-no-files-found: ignore
+          np
