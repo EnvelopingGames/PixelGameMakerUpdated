@@ -1,39 +1,47 @@
 
-/**
- * PixelGameMaker – preload.js
- * Exposes assetsPick/assetsReadDataUrl + module picker via AppAPI.
- */
+// preload.js – exposes a minimal, consistent AppAPI expected by index.html and modules
 const { contextBridge, ipcRenderer } = require("electron");
-const invoke = (ch, ...args) => ipcRenderer.invoke(ch, ...args);
 
-// Assets
-const Assets = {
-  openFolder: () => invoke("assets:openFolder"),
-  saveDataUrl: (payload) => invoke("assets:saveDataUrl", payload),
-  pick: (opts) => invoke("assets:pick", opts),
-  readDataUrl: (payload) => invoke("assets:readDataUrl", payload),
-};
+function invoke(channel, ...args) {
+  return ipcRenderer.invoke(channel, ...args);
+}
 
-// Modules
+// Namespaced helpers
 const Modules = {
   addViaPicker: () => invoke("modules:addViaPicker"),
+  list: () => invoke("modules:list"),
+  openFolder: () => invoke("modules:openFolder"),
+  resolveUrl: (id) => invoke("modules:resolveUrl", id),
 };
 
-// Unified API
+const Assets = {
+  openFolder: () => invoke("assets:openFolder"),
+  saveDataUrl: (opts) => invoke("assets:saveDataUrl", opts || {}),
+  pick: (opts) => invoke("assets:pick", opts || {}),
+  readDataUrl: (opts) => invoke("assets:readDataUrl", opts || {}),
+  cwdUp: (rel) => invoke("assets:cwdUp", rel || ""),
+};
+
+const System = {
+  openModulesFolder: () => invoke("system:openModulesFolder"),
+};
+
 const AppAPI = {
-  // Assets
-  assetsOpenFolder: () => Assets.openFolder(),
-  assetsSaveDataUrl: (payload) => Assets.saveDataUrl(payload),
-  assetsPick: (opts) => Assets.pick(opts),
-  assetsReadDataUrl: (payload) => Assets.readDataUrl(payload),
-  // Modules
+  // modules
   addModuleViaPicker: () => Modules.addViaPicker(),
-  // Escape hatch
+  listModules: () => Modules.list(),
+  openModulesFolder: () => Modules.openFolder(), // keep legacy
+  resolveModuleUrl: (id) => Modules.resolveUrl(id),
+  // assets
+  assetsOpenFolder: () => Assets.openFolder(),
+  assetsSaveDataUrl: (opts) => Assets.saveDataUrl(opts),
+  assetsPick: (opts) => Assets.pick(opts),
+  assetsReadDataUrl: (opts) => Assets.readDataUrl(opts),
+  assetsCwdUp: (rel) => Assets.cwdUp(rel),
+  // system
+  systemOpenModulesFolder: () => System.openModulesFolder(),
+  // misc
   invoke,
 };
 
 contextBridge.exposeInMainWorld("AppAPI", AppAPI);
-// Optional shims for older code
-contextBridge.exposeInMainWorld("assets", Assets);
-contextBridge.exposeInMainWorld("modules", Modules);
-contextBridge.exposeInMainWorld("ipc", { invoke });
