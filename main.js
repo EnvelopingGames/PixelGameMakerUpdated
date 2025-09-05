@@ -53,8 +53,9 @@ async function uniqueDest(dir, baseName){
   }
 }
 function toFileUrl(abs){
-  let p = abs.replace(/\/g,"/"); if (!p.startsWith("/")) p = "/"+p;
-  return encodeURI(`file://${p}`);
+  let p = String(abs).split("\").join("/");
+  if (!p.startsWith("/")) p = "/" + p;
+  return 'file://' + encodeURI(p);
 }
 
 // ---------- Window ----------
