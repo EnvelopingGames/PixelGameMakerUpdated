@@ -43,12 +43,17 @@ jobs:
       - name: Print electron-builder version
         run: npx electron-builder --version
 
-      # Enable detailed logs from electron-builder
-      - name: Build Windows portable EXE
+      - name: Build Windows portable EXE (with logs)
+        shell: pwsh
         env:
           ELECTRON_BUILDER_DEBUG: true
           DEBUG: electron-builder
-        run: npm run build:win
+        run: |
+          $env:CI = "true"
+          # Run the build and tee output to a log file
+          npm run build:win 2>&1 | Tee-Object -FilePath builder.log
+          # Ensure a non-empty log exists even if step fails early
+          if (-not (Test-Path builder.log)) { "" | Out-File -FilePath builder.log }
 
       - name: List dist folder
         if: always()
@@ -56,6 +61,7 @@ jobs:
 
       - name: Read version from package.json
         id: pkg
+        if: always()
         shell: pwsh
         run: |
           $json = Get-Content package.json | ConvertFrom-Json
@@ -63,6 +69,7 @@ jobs:
           echo "name=$($json.name)" >> $env:GITHUB_OUTPUT
 
       - name: Upload EXE artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pkg.outputs.name }}-portable-${{ steps.pkg.outputs.version }}-${{ github.ref_name }}-${{ github.run_number }}
@@ -71,12 +78,13 @@ jobs:
             dist/*.yml
           if-no-files-found: error
 
-      - name: Upload build logs (if present)
+      - name: Upload build logs (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs-${{ github.ref_name }}-${{ github.run_number }}
           path: |
-            *.log
+            builder.log
+            npm-debug.log
             dist/*.log
-          if-no-files-found: ignore
+          if-no-files-found: warn
