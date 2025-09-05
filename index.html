@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- CSP: allow file: for img/audio previews -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; media-src 'self' file:; script-src 'self' 'unsafe-inline'; child-src 'self'; frame-src 'self' file:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pixel Game Maker</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#0f172a;--muted:#1f2937;--text:#e5e7eb;--accent:#60a5fa;--danger:#ef4444;--topbar-bg:#0e1626;--sidebar-bg:#0d1423;--work-bg:#0a1020;--sub:#9ca3af}
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Roboto,system-ui,Arial,sans-serif}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--muted);background: var(--topbar-bg)}
+    .title{font-weight:700}
+    .actions button{margin-left:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--muted);background:#0e1524;color:var(--text);cursor:pointer}
+    .actions button:hover{border-color:var(--accent)}
+    .layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 86px)}
+    .sidebar{border-right:1px solid var(--muted);padding:8px;overflow:auto;background: var(--sidebar-bg)}
+    .group{margin-bottom:14px}
+    .group h3{margin:8px 4px;font-size:12px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+    .module{display:flex;align-items:center;justify-content:space-between;padding:10px;margin:6px 0;border:1px solid var(--muted);border-radius:12px;background:#0d1423}
+    .module button{padding:6px 8px;border-radius:8px;border:1px solid var(--muted);background:#0a1220;color:#fff;cursor:pointer}
+    .module button:hover{border-color:var(--accent)}
+    .name{font-size:14px}
+    .work{position:relative;background: var(--work-bg)}
+    iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+    .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px}
+    .status{padding:8px 12px;border-top:1px solid var(--muted);background:#0e1626;font-size:12px;color:#9ca3af}
+
+    /* Assets modern UI */
+    .assets{display:none;height:100%;display:grid;grid-template-rows:auto 1fr}
+    .toolbar{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--muted);background:#0e1626;align-items:center}
+    .toolbar button,.toolbar .badge{padding:6px 10px;border-radius:10px;border:1px solid var(--muted);background:#0a1220;color:#fff;cursor:pointer}
+    .toolbar .badge{cursor:default}
+    .sp{flex:1}
+    .input,.select{padding:6px 10px;border:1px solid var(--muted);border-radius:10px;background:#0a1220;color:#fff}
+
+    .main{display:grid;grid-template-columns:1fr 320px;gap:12px;padding:12px;height:calc(100% - 46px)}
+    .view{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px,1fr));gap:12px;align-content:start;overflow:auto}
+    .card{position:relative;background:var(--panel);border:1px solid var(--muted);border-radius:12px;overflow:hidden;outline:none;display:flex;flex-direction:column}
+    .card:focus{box-shadow:0 0 0 2px var(--accent)}
+    .pick{position:absolute;top:8px;left:8px;z-index:1;background:rgba(0,0,0,.3);backdrop-filter:blur(2px);padding:4px;border-radius:8px;border:1px solid #273449}
+    .sel{width:16px;height:16px}
+.thumb {
+  aspect-ratio:1/1;
+  display:block;
+  background:#0b1220;
+}
+.thumb img {
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+  image-rendering:pixelated;
+}
+    .thumb.nonimg{font-size:54px;line-height:1}
+    .meta{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-top:1px solid var(--muted)}
+    .meta .n{max-width:64%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .meta .s{color:var(--sub);font-size:12px}
+
+    .list{display:none;overflow:auto}
+    .row{display:grid;grid-template-columns:34px 1fr 120px 120px;gap:8px;align-items:center;border-bottom:1px solid #0f172a;padding:8px 6px}
+    .row.header{color:#9ca3af;font-size:12px;font-weight:700;position:sticky;top:0;background:#0e1626;border-bottom:1px solid var(--muted)}
+    .row .name{display:flex;align-items:center;gap:10px;min-width:0}
+    .row .name img{width:28px;height:28px;object-fit:cover;image-rendering:pixelated;border-radius:6px;border:1px solid #182236;background:#0b1220}
+
+    .side{border-left:1px solid var(--muted);padding-left:12px;overflow:auto}
+    .panel{background:#0f172a;border:1px solid var(--muted);border-radius:12px;overflow:hidden}
+    .side .head{padding:10px 12px;border-bottom:1px solid var(--muted);background:#0e1626;display:flex;justify-content:space-between;align-items:center}
+    .side .body{padding:10px 12px}
+    .pre{white-space:pre-wrap;background:#0b1220;border:1px solid #152033;border-radius:8px;padding:8px;overflow:auto}
+
+    /* Context menu */
+    .menu{position:fixed;min-width:180px;background:#0f172a;border:1px solid #223045;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:6px;display:none;z-index:9999}
+    .menu.open{display:block}
+    .menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:8px 10px;border-radius:8px;cursor:pointer}
+    .menu button:hover{background:#111a2b}
+    .menu .danger{color:#ffb4b4}
+
+    /* Theme/Palettes/Updates styles retained from previous build */
+    .theme-menu{position:relative;display:inline-block;margin-left:6px}
+    .theme-btn{margin-left:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--muted);background:#0e1524;color:var(--text);cursor:pointer}
+    .theme-btn:hover{border-color:var(--accent)}
+    .theme-dropdown{position:absolute;top:120%;right:0;min-width:300px;background:#0f172a;border:1px solid var(--muted);border-radius:12px;padding:12px;display:none;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+    .theme-dropdown.open{display:block}
+    .theme-section{border-top:1px solid var(--muted);padding-top:10px;margin-top:10px}
+    .theme-section:first-child{border-top:none;margin-top:0;padding-top:0}
+    .theme-title{font-size:12px;color:#9ca3af;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.06em}
+    .swatches{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+    .swatch{width:28px;height:28px;border-radius:6px;border:1px solid #334155;cursor:pointer}
+    .picker-row{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+    .picker-row input[type="color"]{appearance:auto;width:44px;height:34px;padding:0;border:1px solid #334155;border-radius:8px;background:#0a1220;cursor:pointer}
+    .picker-row input[type="text"]{flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--muted);background:#0a1220;color:var(--text)}
+    .palette-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .palette-btn{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--muted);border-radius:10px;background:#0a1220;color:var(--text);cursor:pointer}
+    .palette-chip{width:14px;height:14px;border-radius:4px;border:1px solid #334155}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);z-index:1000}
+    .modal.open{display:flex}
+    .modal-card{width:640px;max-width:90vw;background:#0f172a;border:1px solid var(--muted);border-radius:12px;overflow:hidden}
+    .modal-head{padding:12px 14px;border-bottom:1px solid var(--muted);display:flex;justify-content:space-between;align-items:center;background:#0e1626}
+    .modal-body{padding:12px}
+    .versions{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto}
+    .ver{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--muted);border-radius:10px;padding:8px;background:#0a1220}
+    .ver small{color:#9ca3af}
+    .row-actions{display:flex;gap:8px}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="title">Pixel Game Maker</div>
+    <div class="actions">
+      <button id="btnAdd">Add Module (.html)</button>
+      <button id="btnImportUpdate">Import Update (.zip)</button>
+      <button id="btnClearUpdate" title="Revert to built-in UI">Revert Update</button>
+      <button id="btnOpenFolder" title="Open modules folder in Explorer">Open Modules Folder</button>
+
+      <div class="theme-menu">
+        <button id="themeBtn" class="theme-btn" title="Change colors">Theme</button>
+        <div id="themeDropdown" class="theme-dropdown" aria-label="Theme menu">
+          <div class="theme-section">
+            <div class="theme-title">Palettes</div>
+            <div class="palette-grid" id="paletteGrid"></div>
+          </div>
+          <div class="theme-section">
+            <div class="theme-title">Top Bar</div>
+            <div class="swatches" data-target="topbar">
+              <div class="swatch" data-color="#0e1626" style="background:#0e1626"></div>
+              <div class="swatch" data-color="#000000" style="background:#000000"></div>
+              <div class="swatch" data-color="#111827" style="background:#111827"></div>
+              <div class="swatch" data-color="#1f2937" style="background:#1f2937"></div>
+              <div class="swatch" data-color="#f5f5f5" style="background:#f5f5f5;border-color:#cbd5e1"></div>
+            </div>
+            <div class="picker-row"><input type="color" id="pickTop" value="#0e1626"/><input type="text" id="hexTop" placeholder="#RRGGBB"/></div>
+          </div>
+          <div class="theme-section">
+            <div class="theme-title">Sidebar</div>
+            <div class="swatches" data-target="sidebar">
+              <div class="swatch" data-color="#0d1423" style="background:#0d1423"></div>
+              <div class="swatch" data-color="#0a1220" style="background:#0a1220"></div>
+              <div class="swatch" data-color="#2b2b2b" style="background:#2b2b2b"></div>
+              <div class="swatch" data-color="#111827" style="background:#111827"></div>
+              <div class="swatch" data-color="#f5f5f5" style="background:#f5f5f5;border-color:#cbd5e1"></div>
+            </div>
+            <div class="picker-row"><input type="color" id="pickSide" value="#0d1423"/><input type="text" id="hexSide" placeholder="#RRGGBB"/></div>
+          </div>
+          <div class="theme-section">
+            <div class="theme-title">Main Area</div>
+            <div class="swatches" data-target="work">
+              <div class="swatch" data-color="#0a1020" style="background:#0a1020"></div>
+              <div class="swatch" data-color="#000000" style="background:#000000"></div>
+              <div class="swatch" data-color="#111827" style="background:#111827"></div>
+              <div class="swatch" data-color="#1f2937" style="background:#1f2937"></div>
+              <div class="swatch" data-color="#f5f5f5" style="background:#f5f5f5;border-color:#cbd5e1"></div>
+            </div>
+            <div class="picker-row"><input type="color" id="pickWork" value="#0a1020"/><input type="text" id="hexWork" placeholder="#RRGGBB"/></div>
+          </div>
+          <div class="theme-section" style="text-align:right"><button id="resetTheme" class="theme-btn">Reset</button></div>
+        </div>
+      </div>
+      <button id="btnUpdates" class="actions">Updates</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="group">
+        <h3>Assets (built-in)</h3>
+        <div class="module">
+          <div class="name">Open Assets</div>
+          <button id="btnOpenAssets">Open</button>
+        </div>
+      </div>
+      <div class="group">
+        <h3>Modules</h3>
+        <div id="moduleList"></div>
+      </div>
+    </aside>
+
+    <section class="work">
+      <div id="assetsPanel" class="assets">
+        <div class="toolbar">
+          <button id="btnUp">Up</button>
+          <button id="btnNewFolder">New Folder</button>
+          <label for="filePicker" class="badge">Upload</label>
+          <input id="filePicker" type="file" style="display:none"/>
+          <button id="btnOpenAssetsFolder">Open Assets Folder</button>
+          <button id="btnChangeAssets">Change Location</button>
+          <div class="sp"></div>
+          <input id="search" class="input" placeholder="Search name…"/>
+          <select id="filter" class="select">
+            <option value="all">All</option>
+            <option value="image">Images</option>
+            <option value="audio">Audio</option>
+            <option value="data">Data</option>
+            <option value="other">Other</option>
+          </select>
+          <button id="toggleView" class="actions">Grid View</button>
+          <span id="count" class="badge"></span>
+        </div>
+
+        <div class="main">
+          <div class="left">
+            <div id="grid" class="view"></div>
+            <div id="list" class="list">
+              <div class="row header"><div></div><div>Name</div><div>Type/Size</div><div>Modified</div></div>
+            </div>
+          </div>
+
+          <aside class="side">
+            <div class="panel">
+              <div class="head"><strong>Inspector</strong><span id="selCount" class="badge">0 selected</span></div>
+              <div class="body" id="inspector"><div style="color:#9ca3af">Select a file to preview. Right-click for actions.</div></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <iframe id="toolFrame" title="Tool Viewer"></iframe>
+      <div id="emptyState" class="empty">Welcome. Open <span class="link" id="linkAssets" style="text-decoration:underline;cursor:pointer">Assets</span> or add a module to begin.</div>
+    </section>
+  </main>
+
+  <footer class="status" id="status">Ready.</footer>
+
+  <!-- Context menu -->
+  <div id="ctx" class="menu" role="menu" aria-hidden="true">
+    <button data-act="open">Open</button>
+    <button data-act="rename">Rename…</button>
+    <button data-act="move">Move…</button>
+    <button data-act="duplicate">Duplicate</button>
+    <button data-act="delete" class="danger">Delete</button>
+  </div>
+
+  <script>
+    const listEl = document.getElementById('moduleList');
+    const frameEl = document.getElementById('toolFrame');
+    const emptyEl = document.getElementById('emptyState');
+    const statusEl = document.getElementById('status');
+
+    // Assets UI elements
+    const assetsPanel = document.getElementById('assetsPanel');
+    const gridEl = document.getElementById('grid');
+    const listViewEl = document.getElementById('list');
+    const countEl = document.getElementById('count');
+    const inspector = document.getElementById('inspector');
+    const selCount = document.getElementById('selCount');
+    const searchEl = document.getElementById('search');
+    const filterEl = document.getElementById('filter');
+    const ctx = document.getElementById('ctx');
+    let ctxTarget = null;
+
+    const cwdDisplay = document.getElementById('cwdDisplay');
+    const btnOpenAssets = document.getElementById('btnOpenAssets');
+    const btnUp = document.getElementById('btnUp');
+    const btnNewFolder = document.getElementById('btnNewFolder');
+    const filePicker = document.getElementById('filePicker');
+    const btnOpenAssetsFolder = document.getElementById('btnOpenAssetsFolder');
+    const btnChangeAssets = document.getElementById('btnChangeAssets');
+    const linkAssets = document.getElementById('linkAssets');
+    const toggleViewBtn = document.getElementById('toggleView');
+
+    const btnAdd = document.getElementById('btnAdd');
+    const btnOpenFolder = document.getElementById('btnOpenFolder');
+    const btnImportUpdate = document.getElementById('btnImportUpdate');
+    const btnClearUpdate = document.getElementById('btnClearUpdate');
+
+    function setStatus(msg){ statusEl.textContent = msg; }
+
+    // -------- Modules ----------
+    async function refreshList(){
+      const modules = await window.AppAPI.listModules();
+      listEl.innerHTML = '';
+      if (!modules.length){
+        const p = document.createElement('p'); p.style.color = '#9ca3af';
+        p.textContent = 'No modules yet. Click "Add Module" to pick an .html tool.';
+        listEl.appendChild(p);
+      }
+      for (const m of modules){
+        const row = document.createElement('div'); row.className = 'module';
+        const name = document.createElement('div'); name.className = 'name'; name.textContent = m.name;
+        const openBtn = document.createElement('button'); openBtn.textContent = 'Open'; openBtn.onclick = () => openModule(m.id);
+        const delBtn = document.createElement('button'); delBtn.textContent = 'Delete'; delBtn.onclick = async () => {
+          if (!confirm(`Remove module "${m.name}"?`)) return;
+          const res = await window.AppAPI.removeModule(m.id);
+          if (res.ok){ setStatus('Module removed.'); refreshList(); showEmpty(); }
+          else setStatus('Error: ' + (res.message||'failed'));
+        };
+        const right = document.createElement('div'); right.appendChild(openBtn); right.appendChild(delBtn);
+        row.appendChild(name); row.appendChild(right); listEl.appendChild(row);
+      }
+    }
+    async function openModule(id){
+      const res = await window.AppAPI.resolveModuleUrl(id);
+      if (!res.ok){ setStatus('Error: ' + (res.message||'failed')); return; }
+      assetsPanel.style.display = 'none';
+      frameEl.src = res.url; frameEl.style.display = 'block'; emptyEl.style.display = 'none'; setStatus('Module loaded.');
+    }
+    function showEmpty(){ frameEl.style.display = 'none'; assetsPanel.style.display = 'none'; emptyEl.style.display = 'flex'; }
+
+    btnAdd.onclick = async () => {
+      const res = await window.AppAPI.addModuleViaPicker();
+      if (res.ok){ setStatus('Module added.'); refreshList(); }
+      else setStatus('Canceled or failed. ' + (res.message||''));
+    };
+    btnOpenFolder.onclick = async () => { await window.AppAPI.openModulesFolder(); setStatus('Opened modules folder in Explorer.'); };
+    btnImportUpdate.onclick = async () => {
+      const res = await window.AppAPI.importUpdateZip();
+      if (res.ok) setStatus('Update stored. Activate via Updates.');
+      else setStatus('Update failed. ' + (res.message||''));
+    };
+    btnClearUpdate.onclick = async () => {
+      const res = await window.AppAPI.clearUpdate();
+      if (res.ok) setStatus('Reverted to built-in UI.');
+      else setStatus('Could not revert. ' + (res.message||''));
+    };
+
+    // -------- Assets modern UI ----------
+    let cwd = ''; // relative to assets root
+    let isGrid = true;
+
+    function setCount(n){ countEl.textContent = n + ' items'; }
+    function updateSelCount(){ selCount.textContent = document.querySelectorAll('.sel:checked').length + ' selected'; }
+
+    function extType(name){
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      if (['png','jpg','jpeg','gif','webp'].includes(ext)) return 'image';
+      if (['wav','mp3','ogg','flac'].includes(ext)) return 'audio';
+      if (['json','tmx','tsx','txt','csv'].includes(ext)) return 'data';
+      return 'other';
+    }
+
+    function makeCard(item){
+      const type = item.isDir ? 'dir' : extType(item.name);
+      const card = document.createElement('div'); card.className='card';
+      card.tabIndex = 0;
+      card.dataset.name = item.name;
+      card.dataset.type = type;
+      card.dataset.size = item.isDir ? 'Folder' : (Math.max(1, Math.round(item.size/1024)) + ' KB');
+      card.dataset.rel = (cwd?cwd+'/':'') + item.name;
+
+      const pick = document.createElement('label'); pick.className='pick';
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.className='sel'; pick.appendChild(cb);
+      const thumb = document.createElement('div'); thumb.className='thumb' + (type==='image' ? '' : ' nonimg');
+      if (type==='image'){
+        const img = document.createElement('img'); img.loading='lazy';
+        img.alt = item.name;
+        // Ask core for a file:// url
+        img.setAttribute('data-rel', card.dataset.rel);
+        thumb.appendChild(img);
+        // lazy resolve file URL when visible
+        const io = new IntersectionObserver(async (ents)=>{
+          for (const e of ents){ if (e.isIntersecting){ try{
+            const rel = img.getAttribute('data-rel');
+            const r = await window.AppAPI.assetsFileUrl(rel);
+            if (r && r.ok && r.url){ img.src = r.url; }
+          } catch{} io.unobserve(img); } }
+        }, { rootMargin: '200px' });
+        io.observe(img);
+      } else {
+        thumb.textContent = item.isDir ? '📁' : (type==='audio'?'🎵': (type==='data'?'📜':'📄'));
+      }
+      const meta = document.createElement('div'); meta.className='meta';
+      const n = document.createElement('span'); n.className='n'; n.textContent = item.name;
+      const s = document.createElement('span'); s.className='s'; s.textContent = card.dataset.size;
+      meta.appendChild(n); meta.appendChild(s);
+
+      card.appendChild(pick); card.appendChild(thumb); card.appendChild(meta);
+
+      // Click to open dir / preview file
+      card.addEventListener('click', async (e)=>{
+        if (e.target.classList.contains('sel')) return;
+        if (item.isDir){ cwd = (cwd?cwd+'/':'') + item.name; await loadAssets(); return; }
+        showPreview(card.dataset.rel, type, card.dataset.size, item.mtime);
+      });
+
+      return card;
+    }
+
+    function buildListFromGrid(items){
+      listViewEl.innerHTML = '<div class="row header"><div></div><div>Name</div><div>Type/Size</div><div>Modified</div></div>';
+      for (const it of items){
+        const row = document.createElement('div'); row.className='row';
+        const colPick = document.createElement('div'); const cb = document.createElement('input'); cb.type='checkbox'; cb.className='sel'; colPick.appendChild(cb);
+        const colN = document.createElement('div'); colN.className='name';
+        const type = it.isDir ? 'dir' : extType(it.name);
+        if (type==='image'){ const im=document.createElement('img'); (async ()=>{ try{ const r=await window.AppAPI.assetsFileUrl((cwd?cwd+'/':'')+it.name); if(r&&r.ok&&r.url) im.src=r.url; }catch{} })(); colN.appendChild(im); }
+        else { const ic=document.createElement('span'); ic.textContent = it.isDir?'📁':(type==='audio'?'🎵':(type==='data'?'📜':'📄')); ic.style.fontSize='18px'; colN.appendChild(ic); }
+        const span = document.createElement('span'); span.className='n'; span.textContent=it.name; colN.appendChild(span);
+        const colS = document.createElement('div'); colS.textContent = it.isDir ? 'Folder' : (type + ' • ' + Math.max(1, Math.round(it.size/1024)) + ' KB');
+        const colM = document.createElement('div'); colM.textContent = new Date(it.mtime).toLocaleString();
+        row.appendChild(colPick); row.appendChild(colN); row.appendChild(colS); row.appendChild(colM);
+        listViewEl.appendChild(row);
+      }
+    }
+
+    function applyFilters(){
+      const q = (searchEl.value||'').toLowerCase().trim();
+      const kind = filterEl.value;
+      const cards = Array.from(gridEl.children);
+      let visible = 0;
+      for (const card of cards){
+        const name = card.dataset.name.toLowerCase();
+        const type = card.dataset.type;
+        const ok = (!q || name.includes(q)) && (kind==='all' || type===kind || (kind==='data' && type==='dir' && false));
+        card.hidden = !ok;
+        if (ok) visible++;
+      }
+      setCount(visible);
+      // rebuild list from filtered items
+      const items = [];
+      for (let i=0;i<cards.length;i++){
+        if (cards[i].hidden) continue;
+        const it = currentItems[i]; // parallel arrays; safe because we rebuild together
+        if (it) items.push(it);
+      }
+      buildListFromGrid(items);
+    }
+
+    let currentItems = [];
+    async function loadAssets() {
+      const res = await window.AppAPI.assetsList(cwd);
+      if (!res.ok){ setStatus('Assets error: ' + (res.message||'failed')); return; }
+      cwd = res.cwd || '';
+      // Build grid
+      gridEl.innerHTML = '';
+      currentItems = (res.items || []).sort((a,b)=> a.isDir===b.isDir ? a.name.localeCompare(b.name) : (a.isDir?-1:1));
+      for (const it of currentItems) gridEl.appendChild(makeCard(it));
+      setCount(currentItems.length);
+      applyFilters();
+    }
+
+    function showAssets(){
+      frameEl.style.display = 'none';
+      emptyEl.style.display = 'none';
+      assetsPanel.style.display = 'grid';
+      loadAssets();
+      setStatus('Assets opened.');
+    }
+    btnOpenAssets.onclick = showAssets;
+    linkAssets.onclick = showAssets;
+
+    // Toolbar buttons
+    toggleViewBtn.addEventListener('click', ()=>{
+      isGrid = !isGrid;
+      gridEl.style.display = isGrid ? 'grid' : 'none';
+      listViewEl.style.display = isGrid ? 'none' : 'block';
+      toggleViewBtn.textContent = isGrid ? 'Grid View' : 'List View';
+    });
+    btnUp.onclick = async () => { const r = await window.AppAPI.assetsCwdUp(cwd); if (r.ok){ cwd = r.path || ''; loadAssets(); } };
+    btnNewFolder.onclick = async () => {
+      const name = prompt('Folder name:', 'New_Folder'); if (!name) return;
+      const r = await window.AppAPI.assetsMkdir(cwd, name);
+      if (r.ok) { setStatus('Folder created.'); loadAssets(); } else setStatus('Could not create folder. '+(r.message||''));
+    };
+    filePicker.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      const r = await window.AppAPI.assetsUpload(cwd, f.path);
+      if (r.ok) { setStatus('File uploaded.'); loadAssets(); } else setStatus('Upload failed. '+(r.message||''));
+      filePicker.value = '';
+    });
+    btnOpenAssetsFolder.onclick = async ()=> {
+      const r = await window.AppAPI.assetsOpenFolder();
+      if (r.ok) setStatus('Opened in Explorer.'); else setStatus('Open failed. ' + (r.message||''));
+    };
+    btnChangeAssets.onclick = async ()=> {
+      const r = await window.AppAPI.assetsChooseRoot();
+      if (r.ok) { setStatus('Assets location updated.'); cwd = ''; loadAssets(); }
+      else { setStatus('Assets location not changed. ' + (r.message || '')); }
+    };
+    searchEl.addEventListener('input', applyFilters);
+    filterEl.addEventListener('change', applyFilters);
+    document.addEventListener('change', (e)=>{ if(e.target.classList.contains('sel')) updateSelCount(); });
+
+    // Inspector preview
+    function escapeHTML(s){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    async function showPreview(rel, type, size, mtime){
+      if (type==='image'){
+        const r = await window.AppAPI.assetsFileUrl(rel);
+        inspector.innerHTML = r && r.ok && r.url ? ('<div style="text-align:center"><img src="'+r.url+'" style="max-width:100%;image-rendering:pixelated"/></div>') : '<div>No preview.</div>';
+      } else if (type==='audio'){
+        const r = await window.AppAPI.assetsFileUrl(rel);
+        inspector.innerHTML = r && r.ok && r.url ? ('<audio controls src="'+r.url+'" style="width:100%"></audio>') : '<div>No preview.</div>';
+      } else if (type==='data'){
+        const r = await window.AppAPI.assetsReadText(rel);
+        inspector.innerHTML = r && r.ok ? ('<div class="pre">'+escapeHTML(r.text)+'</div>') : '<div>No preview.</div>';
+      } else {
+        inspector.innerHTML = '<div style="color:#9ca3af">No preview available.</div>';
+      }
+      const meta = document.createElement('div'); meta.style.marginTop='8px'; meta.style.color='#9ca3af';
+      meta.textContent = rel + ' • ' + size + (mtime?(' • '+ new Date(mtime).toLocaleString()):'');
+      inspector.appendChild(meta);
+    }
+
+    // Context menu
+    function openMenu(x, y, rel, type){
+      ctxTarget = { rel, type };
+      ctx.style.left = x + 'px'; ctx.style.top = y + 'px';
+      ctx.classList.add('open'); ctx.setAttribute('aria-hidden','false');
+    }
+    function closeMenu(){
+      ctx.classList.remove('open'); ctx.setAttribute('aria-hidden','true'); ctxTarget = null;
+    }
+    document.addEventListener('contextmenu', (e)=>{
+      const card = e.target.closest('.card');
+      if(card){
+        e.preventDefault();
+        openMenu(e.clientX, e.clientY, card.dataset.rel, card.dataset.type);
+      } else closeMenu();
+    });
+    document.addEventListener('click', (e)=>{ if(!e.target.closest('#ctx')) closeMenu(); });
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeMenu(); });
+
+    ctx.addEventListener('click', async (e)=>{
+      const btn = e.target.closest('button[data-act]'); if(!btn || !ctxTarget) return;
+      const act = btn.getAttribute('data-act'); const rel = ctxTarget.rel;
+      if (act==='open'){
+        // if dir, cd; if file, preview
+        const item = currentItems.find(it => ((cwd?cwd+'/':'')+it.name) === rel);
+        if (item && item.isDir){ cwd = rel; await loadAssets(); }
+        else {
+          const type = extType(rel);
+          showPreview(rel, type, '', null);
+        }
+      }
+      if (act==='rename'){
+        const base = rel.split('/'); const oldName = base.pop(); const dir = base.join('/');
+        const to = prompt('Rename to:', oldName); if (!to) return;
+        const r = await window.AppAPI.assetsRename(dir, oldName, to);
+        if (r.ok) { setStatus('Renamed.'); loadAssets(); } else setStatus('Rename failed. '+(r.message||''));
+      }
+      if (act==='move'){
+        const to = prompt('Move to (path within assets):', rel); if (!to) return;
+        const r = await window.AppAPI.assetsMove(rel, to);
+        if (r.ok) { setStatus('Moved.'); loadAssets(); } else setStatus('Move failed. '+(r.message||''));
+      }
+      if (act==='duplicate'){
+        const r = await window.AppAPI.assetsDuplicate(rel);
+        if (r.ok) { setStatus('Duplicated.'); loadAssets(); } else setStatus('Duplicate failed. '+(r.message||''));
+      }
+      if (act==='delete'){
+        if (!confirm('Delete '+rel+' ?')) return;
+        const r = await window.AppAPI.assetsDelete(rel);
+        if (r.ok) { setStatus('Deleted.'); loadAssets(); } else setStatus('Delete failed. '+(r.message||''));
+      }
+      closeMenu();
+    });
+
+    // Init
+    refreshList(); showEmpty();
+
+    // Theme + Palettes + Updates Manager (unchanged behavior; wired to UpdateAPI/AppAPI)
+    (function(){
+      const ROOT = document.documentElement;
+      const KEYS = { topbar:'themeTop', sidebar:'themeSide', work:'themeWork' };
+      const VARS = { topbar:'--topbar-bg', sidebar:'--sidebar-bg', work:'--work-bg' };
+      const DEFAULTS = {
+        topbar: getComputedStyle(ROOT).getPropertyValue('--topbar-bg').trim() || '#0e1626',
+        sidebar: getComputedStyle(ROOT).getPropertyValue('--sidebar-bg').trim() || '#0d1423',
+        work:   getComputedStyle(ROOT).getPropertyValue('--work-bg').trim()   || '#0a1020'
+      };
+      const PALETTES = [
+        { name:'Dark Steel', c:{ topbar:'#0e1626', sidebar:'#111827', work:'#0a1020' } },
+        { name:'Ocean',      c:{ topbar:'#0b3a5b', sidebar:'#0d2235', work:'#082032' } },
+        { name:'Retro DMG',  c:{ topbar:'#8bac0f', sidebar:'#306230', work:'#0f380f' } },
+        { name:'Cream Paper',c:{ topbar:'#f5f5f5', sidebar:'#e7e5e4', work:'#fafaf9' } },
+        { name:'Night',      c:{ topbar:'#000000', sidebar:'#111111', work:'#0a0a0a' } },
+        { name:'Slate',      c:{ topbar:'#1f2937', sidebar:'#111827', work:'#0f172a' } },
+      ];
+      function isHex(v){ return /^#([0-9A-F]{6})$/i.test(v); }
+      function apply(area, col){ ROOT.style.setProperty(VARS[area], col); }
+      function save(area, col){ try { localStorage.setItem(KEYS[area], col); } catch{} }
+      function load(area){ try { return localStorage.getItem(KEYS[area]); } catch { return null; } }
+      ['topbar','sidebar','work'].forEach(a => { const v = load(a); if (v && isHex(v)) apply(a,v); });
+      const btn = document.getElementById('themeBtn'); const dd = document.getElementById('themeDropdown');
+      if (btn && dd){ btn.addEventListener('click', ()=> dd.classList.toggle('open')); document.addEventListener('click', e=>{ if(!dd.contains(e.target)&&e.target!==btn) dd.classList.remove('open'); }); }
+      function wire(area, pickId, hexId){
+        const pick = document.getElementById(pickId); const hex = document.getElementById(hexId);
+        const saved = load(area); const start = (saved && isHex(saved)) ? saved : DEFAULTS[area];
+        if (pick) pick.value = start; if (hex) hex.value = start;
+        function setAll(c){ if(!isHex(c)) return; const u=c.toUpperCase(); apply(area,u); save(area,u); if(pick) pick.value=u; if(hex) hex.value=u; }
+        if (pick) pick.addEventListener('input', e=> setAll(e.target.value));
+        if (hex)  hex.addEventListener('input', e=> { const v=e.target.value.trim().toUpperCase(); if(isHex(v)) setAll(v); });
+        document.querySelectorAll('.swatches[data-target="'+area+'"] .swatch').forEach(el => el.addEventListener('click', ()=> setAll(el.getAttribute('data-color'))));
+      }
+      wire('topbar','pickTop','hexTop'); wire('sidebar','pickSide','hexSide'); wire('work','pickWork','hexWork');
+      const grid=document.getElementById('paletteGrid');
+      if (grid){
+        PALETTES.forEach(p=>{
+          const b=document.createElement('button'); b.className='palette-btn'; b.title=p.name;
+          b.innerHTML = '<span class="palette-chip" style="background:'+p.c.topbar+'"></span>' +
+                        '<span class="palette-chip" style="background:'+p.c.sidebar+'"></span>' +
+                        '<span class="palette-chip" style="background:'+p.c.work+'"></span>' +
+                        '<span style="flex:1;text-align:left">'+p.name+'</span>';
+          b.addEventListener('click', ()=>{
+            Object.entries(p.c).forEach(([a,col])=>{ apply(a,col); save(a,col); });
+            document.getElementById('pickTop').value=p.c.topbar.toUpperCase(); document.getElementById('hexTop').value=p.c.topbar.toUpperCase();
+            document.getElementById('pickSide').value=p.c.sidebar.toUpperCase(); document.getElementById('hexSide').value=p.c.sidebar.toUpperCase();
+            document.getElementById('pickWork').value=p.c.work.toUpperCase();   document.getElementById('hexWork').value=p.c.work.toUpperCase();
+          });
+          grid.appendChild(b);
+        });
+      }
+      const reset=document.getElementById('resetTheme');
+      if (reset){ reset.addEventListener('click', ()=>{
+        ['topbar','sidebar','work'].forEach(a=>{ apply(a,DEFAULTS[a]); save(a,DEFAULTS[a]); });
+        document.getElementById('pickTop').value=DEFAULTS.topbar; document.getElementById('hexTop').value=DEFAULTS.topbar;
+        document.getElementById('pickSide').value=DEFAULTS.sidebar; document.getElementById('hexSide').value=DEFAULTS.sidebar;
+        document.getElementById('pickWork').value=DEFAULTS.work; document.getElementById('hexWork').value=DEFAULTS.work;
+      }); }
+      // Updates modal wiring retained (status/import/activate/remove handled in core)
+      (function(){
+        const modal = document.getElementById('updatesModal');
+        const btnOpen = document.getElementById('btnUpdates');
+        const btnClose = document.getElementById('btnCloseUpdates');
+        const btnImportNew = document.getElementById('btnImportNew');
+        const list = document.getElementById('versionsList');
+        const activeInfo = document.getElementById('activeInfo');
+        const btnReset = document.getElementById('btnResetBuiltIn');
+        function open(){ modal.classList.add('open'); refresh(); }
+        function close(){ modal.classList.remove('open'); }
+        async function refresh(){
+          try {
+            const s = await window.UpdateAPI.status();
+            activeInfo.textContent = s.activeId ? `(Active: ${s.activeId})` : '(Active: Built-in)';
+            list.innerHTML = '';
+            (s.versions || []).forEach(v => {
+              const row = document.createElement('div'); row.className='ver';
+              row.innerHTML = `<div><div><strong>${v.name}</strong></div><small>ID: ${v.id}</small><br/><small>Created: ${new Date(v.created).toLocaleString()}</small></div>
+                               <div class="row-actions"><button data-act="${v.id}">Activate</button><button data-del="${v.id}">Delete</button></div>`;
+              list.appendChild(row);
+            });
+            list.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', async () => { await window.UpdateAPI.activate(b.getAttribute('data-act')); await refresh(); }));
+            list.querySelectorAll('button[data-del]').forEach(b => b.addEventListener('click', async () => { if (!confirm('Delete this update?')) return; await window.UpdateAPI.remove(b.getAttribute('data-del')); await refresh(); }));
+          } catch(e) {
+            list.innerHTML = '<div style="color:#fca5a5">Updater not ready. You must run this build (0.5.1+) for the manager to work.</div>';
+          }
+        }
+        if (btnOpen) btnOpen.addEventListener('click', open);
+        if (btnClose) btnClose.addEventListener('click', close);
+        if (btnImportNew) btnImportNew.addEventListener('click', async () => { await window.UpdateAPI.importZip(); await refresh(); });
+        if (btnReset) btnReset.addEventListener('click', async () => { try { await window.AppAPI.clearUpdate(); await refresh(); } catch {} });
+      })();
+    })();
+  </script>
+
+  <div id="updatesModal" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div><strong>Updates Manager</strong> <small id="activeInfo"></small></div>
+        <div>
+          <button id="btnImportNew">Import Update (.zip)</button>
+          <button id="btnCloseUpdates">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="versions" id="versionsList"></div>
+        <div style="margin-top:10px;text-align:right">
+          <button id="btnResetBuiltIn">Reset to Built-in UI</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
