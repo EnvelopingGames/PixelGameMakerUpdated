@@ -53,8 +53,10 @@ async function uniqueDest(dir, baseName){
   }
 }
 function toFileUrl(abs){
-  let p = String(abs).split("\").join("/");
-  if (!p.startsWith("/")) p = "/" + p;
+  // Avoid backslash string literals to survive packagers/minifiers.
+  const BSLASH = String.fromCharCode(92); // '\'
+  let p = String(abs).split(BSLASH).join('/');
+  if (!p.startsWith('/')) p = '/' + p;
   return 'file://' + encodeURI(p);
 }
 
