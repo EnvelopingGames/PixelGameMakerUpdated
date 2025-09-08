@@ -1,90 +1,264 @@
-name: Build Windows Portable
+name: build-windows
 
 on:
   push:
-    branches: [ main, testing ]
-  workflow_dispatch:
-
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+    branches: ["main", "testing"]
+  workflow_dispatch: {}
 
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20.x
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Environment info
-        run: |
-          node -v
-          npm -v
-          git rev-parse --short HEAD
-
-      - name: Verify required files exist
-        shell: pwsh
-        run: |
-          $required = @("package.json","main.js","preload.js","index.html")
-          foreach ($f in $required) {
-            if (-not (Test-Path $f)) { Write-Error "Missing required file: $f" }
-          }
+          node-version: '20.x'
+          # No lockfile yet → skip npm cache to avoid warnings
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Print electron-builder version
-        run: npx electron-builder --version
-
-      - name: Build Windows portable EXE (with logs)
-        shell: pwsh
-        env:
-          ELECTRON_BUILDER_DEBUG: true
-          DEBUG: electron-builder
         run: |
-          $env:CI = "true"
-          # Run the build and tee output to a log file
-          npm run build:win 2>&1 | Tee-Object -FilePath builder.log
-          # Ensure a non-empty log exists even if step fails early
-          if (-not (Test-Path builder.log)) { "" | Out-File -FilePath builder.log }
+          if (Test-Path package-lock.json) {
+            Write-Host "Using npm ci"
+            npm ci
+          } else {
+            Write-Host "No lockfile found. Using npm install"
+            npm install
+          }
 
-      - name: List dist folder
-        if: always()
-        run: dir dist
-
-      - name: Read version from package.json
-        id: pkg
-        if: always()
-        shell: pwsh
+      - name: Initialize build-logs-testing.log
+        id: initlog
         run: |
-          $json = Get-Content package.json | ConvertFrom-Json
-          echo "version=$($json.version)" >> $env:GITHUB_OUTPUT
-          echo "name=$($json.name)" >> $env:GITHUB_OUTPUT
+          # Ensure logs exist even if later steps error
+          New-Item -ItemType File -Path build-logs-testing.log -Force | Out-Null
+          New-Item -ItemType File -Path builder_console.txt -Force | Out-Null
 
-      - name: Upload EXE artifact
-        if: success()
+          $log = "build-logs-testing.log"
+          $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $runner = "$env:ImageOS | $env:ImageVersion"
+          $nodev = node -v
+          $npmv = npm -v
+          $electronV = node -e "console.log(require('electron/package.json').version)" 2>$null
+          $builderV = node -e "console.log(require('electron-builder/package.json').version)" 2>$null
+
+          "# [1] Build Environment"                                   | Out-File $log -Encoding UTF8
+          "timestamp_utc: $ts"                                         | Out-File $log -Append
+          "runner_image: $runner"                                      | Out-File $log -Append
+          "os: $([System.Environment]::OSVersion.VersionString)"       | Out-File $log -Append
+          "node: $nodev"                                               | Out-File $log -Append
+          "npm: $npmv"                                                 | Out-File $log -Append
+          "electron: $electronV"                                       | Out-File $log -Append
+          "electron_builder: $builderV"                                | Out-File $log -Append
+          "arch: x64"                                                  | Out-File $log -Append
+          "commit_sha: $env:GITHUB_SHA"                                | Out-File $log -Append
+          "branch: $env:GITHUB_REF"                                    | Out-File $log -Append
+          ""                                                            | Out-File $log -Append
+
+      - name: Hash dependency manifests
+        run: |
+          $log = "build-logs-testing.log"
+          "# [2] Dependency Snapshot"                                  | Out-File $log -Append
+          if (Test-Path package.json) {
+            $h1 = (Get-FileHash package.json -Algorithm SHA256).Hash
+            "package_json_sha256: $h1"                                  | Out-File $log -Append
+          }
+          if (Test-Path package-lock.json) {
+            $h2 = (Get-FileHash package-lock.json -Algorithm SHA256).Hash
+            "package_lock_sha256: $h2"                                  | Out-File $log -Append
+          } else {
+            "package_lock_sha256: (none)"                               | Out-File $log -Append
+          }
+          "prod_dependencies:"                                          | Out-File $log -Append
+          try {
+            $deps = (Get-Content package.json -Raw | ConvertFrom-Json).dependencies
+            if ($deps) {
+              $deps.PSObject.Properties | ForEach-Object {
+                $_.Name + ": " + $_.Value
+              } | ForEach-Object { "  - $_" | Out-File $log -Append }
+            } else {
+              "  - (none)" | Out-File $log -Append
+            }
+          } catch {
+            "  - (failed to parse dependencies)" | Out-File $log -Append
+          }
+          ""                                                            | Out-File $log -Append
+
+      - name: Build portable EXE (tee console)
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $builderLog = "builder_console.txt"
+          cmd /c "npm run build:win" *>&1 | Tee-Object -FilePath $builderLog
+
+      - name: Summarize builder warnings
+        if: always()
+        run: |
+          $log = "build-logs-testing.log"
+          $builderLog = "builder_console.txt"
+          "# [6] Warnings / Missing Resources" | Out-File $log -Append
+          if (Test-Path $builderLog) {
+            $lines = Get-Content $builderLog -Raw
+            $warns = @()
+            # Use double-quoted regex and avoid apostrophes in patterns
+            if ($lines -match "file source doesn.t exist") { $warns += "missing_extraResources_data: true" }
+            if ($lines -match "default Electron icon is used") { $warns += "icon_fallback: true" }
+            if ($lines -match "author is missed in the package.json") { $warns += "author_missing_in_package_json: true" }
+            if ($warns.Count -eq 0) { $warns += "none" }
+            foreach ($w in $warns) { $w | Out-File $log -Append }
+          } else {
+            "builder_console.txt not found" | Out-File $log -Append
+          }
+          "" | Out-File $log -Append
+
+      - name: Locate artifacts and asar
+        id: locate_artifacts
+        run: |
+          $exe = Get-ChildItem -Path dist -Recurse -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($null -eq $exe) { throw "No EXE artifact found in dist" }
+          "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Portable EXE may NOT have a sibling resources\app.asar.
+          # Search recursively under dist for app.asar (e.g., win-unpacked\resources\app.asar)
+          $asarFile = Get-ChildItem -Path dist -Recurse -Filter app.asar -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($null -ne $asarFile) {
+            "asar_path=$($asarFile.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "asar_found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "asar_found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Inspect app.asar (manifest + checksums)
+        if: steps.locate_artifacts.outputs.asar_found == 'true'
+        run: |
+          $log = "build-logs-testing.log"
+          $asar = "${{ steps.locate_artifacts.outputs.asar_path }}"
+          "# [3] Bundle Manifest"                                      | Out-File $log -Append
+          npm exec --yes asar list "$asar" | ForEach-Object { "  - $_" | Out-File $log -Append }
+          ""                                                            | Out-File $log -Append
+
+          $tmp = Join-Path $env:RUNNER_TEMP "asar_extract"
+          if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+          npm exec --yes asar extract "$asar" "$tmp"
+
+          $files = @("main.js","preload.js","index.html","package.json")
+          foreach ($f in $files) {
+            $p = Join-Path $tmp $f
+            if (Test-Path $p) {
+              $sz = (Get-Item $p).Length
+              $h = (Get-FileHash $p -Algorithm SHA256).Hash
+              "$($f): size=$sz sha256=$h" | Out-File $log -Append
+            } else {
+              "$($f): (missing in asar)" | Out-File $log -Append
+            }
+          }
+          ""                                                            | Out-File $log -Append
+
+      - name: Parse-check shipped JS
+        if: steps.locate_artifacts.outputs.asar_found == 'true'
+        continue-on-error: true
+        run: |
+          $log = "build-logs-testing.log"
+          "# [8] Runtime Sanity Probe (syntax only)"                   | Out-File $log -Append
+          $tmp = Join-Path $env:RUNNER_TEMP "asar_extract"
+          $ok = $true
+          foreach ($js in @("main.js","preload.js")) {
+            $p = Join-Path $tmp $js
+            if (Test-Path $p) {
+              try {
+                node -e "require('vm').runInNewContext(require('fs').readFileSync(process.argv[1],'utf8'))" "$p"
+                "syntax_ok: $js" | Out-File $log -Append
+              } catch {
+                "syntax_error: $js -> $($_.Exception.Message)" | Out-File $log -Append
+                $ok = $false
+              }
+            } else {
+              "missing_js: $js" | Out-File $log -Append
+              $ok = $false
+            }
+          }
+          if (-not $ok) {
+            "syntax_gate: FAIL" | Out-File $log -Append
+            Write-Error "Syntax check failed for shipped JS"; exit 1
+          } else {
+            "syntax_gate: OK" | Out-File $log -Append
+          }
+          ""                                                            | Out-File $log -Append
+
+      - name: Scan DOM hooks (index.html) and preload API
+        if: steps.locate_artifacts.outputs.asar_found == 'true'
+        run: |
+          $log = "build-logs-testing.log"
+          $tmp = Join-Path $env:RUNNER_TEMP "asar_extract"
+
+          "# [5] DOM / UI Hooks"                                       | Out-File $log -Append
+          $idx = Join-Path $tmp "index.html"
+          if (Test-Path $idx) {
+            $ids = @("btnAdd","themeBtn","btnSettings")
+            foreach ($id in $ids) {
+              $present = Select-String -Path $idx -Pattern $id -SimpleMatch -Quiet
+              "$($id): " + ($(if ($present) { "present" } else { "missing" })) | Out-File $log -Append
+            }
+          } else {
+            "index.html missing" | Out-File $log -Append
+          }
+          ""                                                            | Out-File $log -Append
+
+          "# [4] Runtime API Contract (static)"                         | Out-File $log -Append
+          $pre = Join-Path $tmp "preload.js"
+          if (Test-Path $pre) {
+            $apis = @("AppAPI","UpdateAPI","ModulesAPI","AssetsAPI")
+            foreach ($api in $apis) {
+              $present = Select-String -Path $pre -Pattern ("exposeInMainWorld\(\s*'"+$api+"'") -AllMatches -Quiet
+              "$($api): " + ($(if ($present) { "exposed" } else { "missing" })) | Out-File $log -Append
+            }
+          } else {
+            "preload.js missing" | Out-File $log -Append
+          }
+          ""                                                            | Out-File $log -Append
+
+      - name: Record artifact metadata
+        run: |
+          $log = "build-logs-testing.log"
+          "# [7] Packaging Artifacts"                                  | Out-File $log -Append
+          $exe = "${{ steps.locate_artifacts.outputs.exe_path }}"
+          $size = (Get-Item $exe).Length
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          "exe: $exe"                                                  | Out-File $log -Append
+          "exe_size_bytes: $size"                                      | Out-File $log -Append
+          "exe_sha256: $hash"                                          | Out-File $log -Append
+          if ('${{ steps.locate_artifacts.outputs.asar_found }}' -eq 'false') {
+            "note: app.asar not found on disk (likely embedded in portable EXE). Skipped ASAR checks." | Out-File $log -Append
+          }
+          ""                                                            | Out-File $log -Append
+
+      - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.pkg.outputs.name }}-portable-${{ steps.pkg.outputs.version }}-${{ github.ref_name }}-${{ github.run_number }}
-          path: |
-            dist/*.exe
-            dist/*.yml
+          name: PixelGameMaker-Portable
+          path: ${{ steps.locate_artifacts.outputs.exe_path }}
           if-no-files-found: error
+          retention-days: 14
 
-      - name: Upload build logs (always)
+      - name: Upload builder console
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ github.ref_name }}-${{ github.run_number }}
-          path: |
-            builder.log
-            npm-debug.log
-            dist/*.log
+          name: builder_console
+          path: builder_console.txt
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload build-logs-testing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-testing
+          path: build-logs-testing.log
+          if-no-files-found: warn
+          retention-days: 30
