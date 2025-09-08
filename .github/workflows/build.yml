@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          # Removed cache: 'npm' since there's no lockfile yet
+          # No lockfile yet → skip npm cache to avoid warnings
 
       - name: Install dependencies
         run: |
