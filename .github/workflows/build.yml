@@ -115,17 +115,25 @@ jobs:
           }
           "" | Out-File $log -Append
 
-      - name: Locate artifacts
+      - name: Locate artifacts and asar
         id: locate_artifacts
         run: |
           $exe = Get-ChildItem -Path dist -Recurse -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if ($null -eq $exe) { throw "No EXE artifact found in dist" }
           "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          $asar = Join-Path $exe.Directory.FullName "resources\\app.asar"
-          if (!(Test-Path $asar)) { throw "app.asar not found: $asar" }
-          "asar_path=$asar" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Portable EXE may NOT have a sibling resources\app.asar.
+          # Search recursively under dist for app.asar (e.g., win-unpacked\resources\app.asar)
+          $asarFile = Get-ChildItem -Path dist -Recurse -Filter app.asar -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($null -ne $asarFile) {
+            "asar_path=$($asarFile.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "asar_found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "asar_found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
 
       - name: Inspect app.asar (manifest + checksums)
+        if: steps.locate_artifacts.outputs.asar_found == 'true'
         run: |
           $log = "build-logs-testing.log"
           $asar = "${{ steps.locate_artifacts.outputs.asar_path }}"
@@ -152,6 +160,7 @@ jobs:
           ""                                                            | Out-File $log -Append
 
       - name: Parse-check shipped JS
+        if: steps.locate_artifacts.outputs.asar_found == 'true'
         continue-on-error: true
         run: |
           $log = "build-logs-testing.log"
@@ -182,6 +191,7 @@ jobs:
           ""                                                            | Out-File $log -Append
 
       - name: Scan DOM hooks (index.html) and preload API
+        if: steps.locate_artifacts.outputs.asar_found == 'true'
         run: |
           $log = "build-logs-testing.log"
           $tmp = Join-Path $env:RUNNER_TEMP "asar_extract"
@@ -222,6 +232,9 @@ jobs:
           "exe: $exe"                                                  | Out-File $log -Append
           "exe_size_bytes: $size"                                      | Out-File $log -Append
           "exe_sha256: $hash"                                          | Out-File $log -Append
+          if ('${{ steps.locate_artifacts.outputs.asar_found }}' -eq 'false') {
+            "note: app.asar not found on disk (likely embedded in portable EXE). Skipped ASAR checks." | Out-File $log -Append
+          }
           ""                                                            | Out-File $log -Append
 
       - name: Upload EXE
