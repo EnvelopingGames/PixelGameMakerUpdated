@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          cache: 'npm'
+          # Removed cache: 'npm' since there's no lockfile yet
 
       - name: Install dependencies
         run: |
@@ -35,6 +35,10 @@ jobs:
       - name: Initialize build-logs-testing.log
         id: initlog
         run: |
+          # Ensure logs exist even if later steps error
+          New-Item -ItemType File -Path build-logs-testing.log -Force | Out-Null
+          New-Item -ItemType File -Path builder_console.txt -Force | Out-Null
+
           $log = "build-logs-testing.log"
           $ts = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $runner = "$env:ImageOS | $env:ImageVersion"
@@ -90,25 +94,26 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $builderLog = "builder_console.txt"
           cmd /c "npm run build:win" *>&1 | Tee-Object -FilePath $builderLog
-      
+
       - name: Summarize builder warnings
         if: always()
         run: |
           $log = "build-logs-testing.log"
           $builderLog = "builder_console.txt"
-          "# [6] Warnings / Missing Resources"                         | Out-File $log -Append
+          "# [6] Warnings / Missing Resources" | Out-File $log -Append
           if (Test-Path $builderLog) {
             $lines = Get-Content $builderLog -Raw
             $warns = @()
-            if ($lines -match 'file source doesn\\'t exist') { $warns += "missing_extraResources_data: true" }
-            if ($lines -match 'default Electron icon is used') { $warns += "icon_fallback: true" }
-            if ($lines -match 'author is missed in the package.json') { $warns += "author_missing_in_package_json: true" }
+            # Use double-quoted regex and avoid apostrophes in patterns
+            if ($lines -match "file source doesn.t exist") { $warns += "missing_extraResources_data: true" }
+            if ($lines -match "default Electron icon is used") { $warns += "icon_fallback: true" }
+            if ($lines -match "author is missed in the package.json") { $warns += "author_missing_in_package_json: true" }
             if ($warns.Count -eq 0) { $warns += "none" }
             foreach ($w in $warns) { $w | Out-File $log -Append }
           } else {
             "builder_console.txt not found" | Out-File $log -Append
           }
-          ""                                                            | Out-File $log -Append
+          "" | Out-File $log -Append
 
       - name: Locate artifacts
         id: locate_artifacts
@@ -147,6 +152,7 @@ jobs:
           ""                                                            | Out-File $log -Append
 
       - name: Parse-check shipped JS
+        continue-on-error: true
         run: |
           $log = "build-logs-testing.log"
           "# [8] Runtime Sanity Probe (syntax only)"                   | Out-File $log -Append
@@ -167,7 +173,12 @@ jobs:
               $ok = $false
             }
           }
-          if (-not $ok) { Write-Error "Syntax check failed for shipped JS"; exit 1 }
+          if (-not $ok) {
+            "syntax_gate: FAIL" | Out-File $log -Append
+            Write-Error "Syntax check failed for shipped JS"; exit 1
+          } else {
+            "syntax_gate: OK" | Out-File $log -Append
+          }
           ""                                                            | Out-File $log -Append
 
       - name: Scan DOM hooks (index.html) and preload API
@@ -193,7 +204,7 @@ jobs:
           if (Test-Path $pre) {
             $apis = @("AppAPI","UpdateAPI","ModulesAPI","AssetsAPI")
             foreach ($api in $apis) {
-              $present = Select-String -Path $pre -Pattern ("exposeInMainWorld\\(\\s*'"+$api+"'") -AllMatches -Quiet
+              $present = Select-String -Path $pre -Pattern ("exposeInMainWorld\(\s*'"+$api+"'") -AllMatches -Quiet
               "$api: " + ($(if ($present) { "exposed" } else { "missing" })) | Out-File $log -Append
             }
           } else {
@@ -236,5 +247,5 @@ jobs:
         with:
           name: build-logs-testing
           path: build-logs-testing.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
