@@ -1,10 +1,12 @@
 /**
- * PixelGameMaker – main.js (v0.5.1 patched, portable + full APIs)
+ * PixelGameMaker – main.js (v0.5.1 patched, portable + full APIs + topbar cleanup + prefix-check fix)
  * - Portable-first data dirs
  * - Full Assets IPC used by index.html
  * - Full Modules IPC (list/resolve/remove/add/openFolder)
  * - Minimal Updates manager IPC
  * - Hardened path->URL conversion (no regex backslash literals)
+ * - NEW: Top bar cleanup via DOM injection (removes update buttons; adds Settings)
+ * - NEW: Replace fragile regex in data URL guard with startsWith() to prevent syntax errors
  */
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
@@ -76,6 +78,39 @@ function toFileUrl(abs) {
   return "file://" + encodeURI(p);
 }
 
+// ---------- NEW: Topbar cleanup helper ----------
+function attachTopbarButtonsPatch(win) {
+  win.webContents.on("did-finish-load", () => {
+    const js = `
+      (function () {
+        try {
+          const bar = document.querySelector('.topbar .actions') || document.querySelector('.actions') || document.querySelector('#actions') || document.body;
+          // Remove update-related buttons entirely
+          ['btnImportUpdate','btnClearUpdate','btnUpdates'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+          });
+          // Ensure Settings button exists (placeholder; no handler yet)
+          if (!document.getElementById('btnSettings')) {
+            const btn = document.createElement('button');
+            btn.id = 'btnSettings';
+            btn.textContent = 'Settings';
+            btn.title = 'Open Settings';
+            // Insert near Theme button if available; otherwise append
+            const themeBtn = document.getElementById('themeBtn');
+            if (themeBtn && themeBtn.parentElement === bar) {
+              bar.insertBefore(btn, themeBtn.nextSibling);
+            } else {
+              bar.appendChild(btn);
+            }
+          }
+        } catch {}
+      })();
+    `;
+    win.webContents.executeJavaScript(js).catch(()=>{});
+  });
+}
+
 // ---------- Window ----------
 let mainWindow;
 function createWindow() {
@@ -92,6 +127,8 @@ function createWindow() {
     },
   });
   mainWindow.loadFile(path.join(__dirname, "index.html"));
+  // Apply topbar cleanup after the page loads
+  attachTopbarButtonsPatch(mainWindow);
   if (isDev) mainWindow.webContents.openDevTools({ mode: "detach" });
 }
 app.whenReady().then(createWindow);
@@ -167,7 +204,8 @@ ipcMain.handle("assets:readText", async (_evt, rel = "") => {
 ipcMain.handle("assets:saveDataUrl", async (_evt, payload = {}) => {
   try {
     const { suggested = "sprites/sprite.png", dataUrl } = payload;
-    if (typeof dataUrl !== "string" || !/^data:image\/png;base64,/.test(dataUrl))
+    const prefix = "data:image/png;base64,";
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith(prefix))
       return { ok: false, error: "Expected data:image/png;base64,..." };
     const root = getAssetsRoot();
     const defAbs = path.resolve(root, path.normalize(suggested));
@@ -179,7 +217,7 @@ ipcMain.handle("assets:saveDataUrl", async (_evt, payload = {}) => {
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
     const outAbs = res.filePath;
     if (!within(root, outAbs)) return { ok: false, error: "Save must be inside Assets" };
-    const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+    const base64 = dataUrl.slice(prefix.length);
     await fsp.mkdir(path.dirname(outAbs), { recursive: true });
     await fsp.writeFile(outAbs, Buffer.from(base64, "base64"));
     return { ok: true, rel: slashify(path.relative(root, outAbs)), path: outAbs };
