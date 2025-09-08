@@ -152,9 +152,9 @@ jobs:
             if (Test-Path $p) {
               $sz = (Get-Item $p).Length
               $h = (Get-FileHash $p -Algorithm SHA256).Hash
-              "$f: size=$sz sha256=$h" | Out-File $log -Append
+              "$($f): size=$sz sha256=$h" | Out-File $log -Append
             } else {
-              "$f: (missing in asar)" | Out-File $log -Append
+              "$($f): (missing in asar)" | Out-File $log -Append
             }
           }
           ""                                                            | Out-File $log -Append
@@ -202,7 +202,7 @@ jobs:
             $ids = @("btnAdd","themeBtn","btnSettings")
             foreach ($id in $ids) {
               $present = Select-String -Path $idx -Pattern $id -SimpleMatch -Quiet
-              "$id: " + ($(if ($present) { "present" } else { "missing" })) | Out-File $log -Append
+              "$($id): " + ($(if ($present) { "present" } else { "missing" })) | Out-File $log -Append
             }
           } else {
             "index.html missing" | Out-File $log -Append
@@ -215,7 +215,7 @@ jobs:
             $apis = @("AppAPI","UpdateAPI","ModulesAPI","AssetsAPI")
             foreach ($api in $apis) {
               $present = Select-String -Path $pre -Pattern ("exposeInMainWorld\(\s*'"+$api+"'") -AllMatches -Quiet
-              "$api: " + ($(if ($present) { "exposed" } else { "missing" })) | Out-File $log -Append
+              "$($api): " + ($(if ($present) { "exposed" } else { "missing" })) | Out-File $log -Append
             }
           } else {
             "preload.js missing" | Out-File $log -Append
