@@ -1,14 +1,11 @@
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <!-- CSP: allow file: for img/audio previews -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; media-src 'self' file:; script-src 'self' 'unsafe-inline'; child-src 'self'; frame-src 'self' file:;" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pixel Game Maker</title>
   <style>
-    /* Masterball theme */
     :root{
       --bg:#1a1730;
       --panel:#201b3d;
@@ -16,9 +13,9 @@
       --text:#e5e7eb;
       --accent:#9d3fb0;
       --danger:#ef4444;
-      --topbar-bg:#C40E56;   /* Masterball top bar */
-      --sidebar-bg:#402843;  /* Masterball sidebar */
-      --work-bg:#2C274E;     /* Masterball main area */
+      --topbar-bg:#C40E56;
+      --sidebar-bg:#402843;
+      --work-bg:#2C274E;
       --sub:#c9c9d6;
     }
     *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Roboto,system-ui,Arial,sans-serif}
@@ -38,15 +35,12 @@
     iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
     .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#e0d7ea;font-size:14px}
     .status{padding:8px 12px;border-top:1px solid var(--muted);background:#6f1d46;font-size:12px;color:#ffe4f1}
-
-    /* Assets modern UI */
     .assets{display:none;height:100%;grid-template-rows:auto 1fr}
     .toolbar{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--muted);background:#5a1b3c;align-items:center}
     .toolbar button,.toolbar .badge{padding:6px 10px;border-radius:10px;border:1px solid var(--muted);background:#341334;color:#fff;cursor:pointer}
     .toolbar .badge{cursor:default}
     .sp{flex:1}
     .input,.select{padding:6px 10px;border:1px solid var(--muted);border-radius:10px;background:#2a1831;color:#fff}
-
     .main{display:grid;grid-template-columns:1fr 320px;gap:12px;padding:12px;height:calc(100% - 46px)}
     .view{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px,1fr));gap:12px;align-content:start;overflow:auto}
     .card{position:relative;background:var(--panel);border:1px solid var(--muted);border-radius:12px;overflow:hidden;outline:none;display:flex;flex-direction:column}
@@ -59,25 +53,39 @@
     .meta{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-top:1px solid var(--muted)}
     .meta .n{max-width:64%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .meta .s{color:var(--sub);font-size:12px}
-
     .list{display:none;overflow:auto}
     .row{display:grid;grid-template-columns:34px 1fr 120px 120px;gap:8px;align-items:center;border-bottom:1px solid #0f172a;padding:8px 6px}
     .row.header{color:#e7cde3;font-size:12px;font-weight:700;position:sticky;top:0;background:#5a1b3c;border-bottom:1px solid var(--muted)}
     .row .name{display:flex;align-items:center;gap:10px;min-width:0}
     .row .name img{width:28px;height:28px;object-fit:cover;image-rendering:pixelated;border-radius:6px;border:1px solid #182236;background:#0b1220}
-
     .side{border-left:1px solid var(--muted);padding-left:12px;overflow:auto}
     .panel{background:#2b214e;border:1px solid var(--muted);border-radius:12px;overflow:hidden}
     .side .head{padding:10px 12px;border-bottom:1px solid var(--muted);background:#5a1b3c;display:flex;justify-content:space-between;align-items:center}
     .side .body{padding:10px 12px}
     .pre{white-space:pre-wrap;background:#0b1220;border:1px solid #152033;border-radius:8px;padding:8px;overflow:auto}
-
-    /* Context menu */
     .menu{position:fixed;min-width:180px;background:#2b214e;border:1px solid #223045;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:6px;display:none;z-index:9999}
     .menu.open{display:block}
     .menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:8px 10px;border-radius:8px;cursor:pointer}
     .menu button:hover{background:#33265c}
     .menu .danger{color:#ffb4b4}
+    .theme-menu{position:relative;display:inline-block;margin-left:6px}
+    .theme-btn{margin-left:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--muted);background:#0e1524;color:var(--text);cursor:pointer}
+    .theme-btn:hover{border-color:var(--accent)}
+    .theme-dropdown{position:absolute;top:120%;right:0;min-width:320px;background:#2b214e;border:1px solid var(--muted);border-radius:12px;padding:12px;display:none;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+    .theme-dropdown.open{display:block}
+    .theme-title{font-size:12px;color:#e0d7ea;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.06em}
+    .picker-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .picker-row label{min-width:84px;color:#e0d7ea;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+    .picker-row input[type='color']{appearance:auto;width:44px;height:34px;padding:0;border:1px solid #334155;border-radius:8px;background:#0a1220;cursor:pointer}
+    .picker-row input[type='text']{flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--muted);background:#0a1220;color:var(--text)}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:1000}
+    .modal.open{display:flex}
+    .modal-card{width:480px;max-width:92vw;background:#2b214e;border:1px solid var(--muted);border-radius:14px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+    .modal-head{padding:12px 14px;border-bottom:1px solid var(--muted);background:#5a1b3c}
+    .modal-body{padding:16px;color:#e0d7ea}
+    .modal-foot{padding:12px 14px;border-top:1px solid var(--muted);display:flex;gap:8px;justify-content:flex-end}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid var(--muted);background:#341334;color:#fff;cursor:pointer}
+    .btn:hover{border-color:var(--accent)}
   </style>
 </head>
 <body>
@@ -86,6 +94,20 @@
     <div class="actions">
       <button id="btnAdd">Add Module (.html)</button>
       <button id="btnOpenFolder" title="Open modules folder in Explorer">Open Modules Folder</button>
+      <div class="theme-menu">
+        <button id="themeBtn" class="theme-btn" title="Change colors">Theme</button>
+        <div id="themeDropdown" class="theme-dropdown" aria-label="Theme menu">
+          <div class="theme-title">Preset</div>
+          <div class="picker-row">
+            <button id="applyMasterball" class="btn" title="Apply Masterball preset">Apply Masterball</button>
+          </div>
+          <div class="theme-title">Customize</div>
+          <div class="picker-row"><label>Top Bar</label><input type="color" id="pickTop" value="#C40E56"/><input type="text" id="hexTop" value="#C40E56"/></div>
+          <div class="picker-row"><label>Sidebar</label><input type="color" id="pickSide" value="#402843"/><input type="text" id="hexSide" value="#402843"/></div>
+          <div class="picker-row"><label>Main</label><input type="color" id="pickWork" value="#2C274E"/><input type="text" id="hexWork" value="#2C274E"/></div>
+          <div class="picker-row" style="justify-content:flex-end"><button id="resetTheme" class="btn">Reset</button></div>
+        </div>
+      </div>
       <button id="btnSettings" title="Open Settings">Settings</button>
     </div>
   </header>
@@ -151,7 +173,6 @@
 
   <footer class="status" id="status">Ready.</footer>
 
-  <!-- Context menu -->
   <div id="ctx" class="menu" role="menu" aria-hidden="true">
     <button data-act="open">Open</button>
     <button data-act="rename">Rename…</button>
@@ -160,13 +181,23 @@
     <button data-act="delete" class="danger">Delete</button>
   </div>
 
+  <div id="assetsModal" class="modal" aria-modal="true" role="dialog">
+    <div class="modal-card">
+      <div class="modal-head"><strong>Setup</strong></div>
+      <div class="modal-body">please choose where to store assets</div>
+      <div class="modal-foot">
+        <button id="btnCancelAssets" class="btn">Cancel</button>
+        <button id="btnOkAssets" class="btn">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const listEl = document.getElementById('moduleList');
     const frameEl = document.getElementById('toolFrame');
     const emptyEl = document.getElementById('emptyState');
     const statusEl = document.getElementById('status');
 
-    // Assets UI elements
     const assetsPanel = document.getElementById('assetsPanel');
     const gridEl = document.getElementById('grid');
     const listViewEl = document.getElementById('list');
@@ -190,9 +221,23 @@
     const btnAdd = document.getElementById('btnAdd');
     const btnOpenFolder = document.getElementById('btnOpenFolder');
 
+    const themeBtn = document.getElementById('themeBtn');
+    const themeDropdown = document.getElementById('themeDropdown');
+    const applyMasterball = document.getElementById('applyMasterball');
+    const pickTop = document.getElementById('pickTop');
+    const pickSide = document.getElementById('pickSide');
+    const pickWork = document.getElementById('pickWork');
+    const hexTop = document.getElementById('hexTop');
+    const hexSide = document.getElementById('hexSide');
+    const hexWork = document.getElementById('hexWork');
+    const resetTheme = document.getElementById('resetTheme');
+
+    const assetsModal = document.getElementById('assetsModal');
+    const btnOkAssets = document.getElementById('btnOkAssets');
+    const btnCancelAssets = document.getElementById('btnCancelAssets');
+
     function setStatus(msg){ statusEl.textContent = msg; }
 
-    // -------- Modules ----------
     async function refreshList(){
       const modules = await window.AppAPI.listModules();
       listEl.innerHTML = '';
@@ -230,8 +275,7 @@
     };
     btnOpenFolder.onclick = async () => { await window.AppAPI.openModulesFolder(); setStatus('Opened modules folder in Explorer.'); };
 
-    // -------- Assets modern UI ----------
-    let cwd = ''; // relative to assets root
+    let cwd = '';
     let isGrid = true;
 
     function setCount(n){ countEl.textContent = n + ' items'; }
@@ -350,7 +394,6 @@
     btnOpenAssets.onclick = showAssets;
     linkAssets.onclick = showAssets;
 
-    // Toolbar buttons
     toggleViewBtn.addEventListener('click', ()=>{
       isGrid = !isGrid;
       gridEl.style.display = isGrid ? 'grid' : 'none';
@@ -382,7 +425,6 @@
     filterEl.addEventListener('change', applyFilters);
     document.addEventListener('change', (e)=>{ if(e.target.classList.contains('sel')) updateSelCount(); });
 
-    // Inspector preview
     function escapeHTML(s){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
     async function showPreview(rel, type, size, mtime){
       if (type==='image'){
@@ -402,7 +444,6 @@
       inspector.appendChild(meta);
     }
 
-    // Context menu
     function openMenu(x, y, rel, type){
       ctxTarget = { rel, type };
       ctx.style.left = x + 'px'; ctx.style.top = y + 'px';
@@ -455,12 +496,63 @@
       closeMenu();
     });
 
-    // Init
+    // THEME
+    const ROOT = document.documentElement;
+    const VARS = { topbar:'--topbar-bg', sidebar:'--sidebar-bg', work:'--work-bg' };
+    const STORAGE = { topbar:'pgm_theme_top', sidebar:'pgm_theme_side', work:'pgm_theme_work' };
+    const MASTERBALL = { topbar:'#C40E56', sidebar:'#402843', work:'#2C274E' };
+    function setVar(area, val){ ROOT.style.setProperty(VARS[area], val); try{ localStorage.setItem(STORAGE[area], val); }catch{} }
+    function getVar(area){ try{ return localStorage.getItem(STORAGE[area]); }catch{ return null; } }
+    function applyMaster(){ Object.entries(MASTERBALL).forEach(([k,v])=> setVar(k,v)); syncPickers(); }
+    function syncPickers(){
+      pickTop.value = getComputedStyle(ROOT).getPropertyValue(VARS.topbar).trim() || MASTERBALL.topbar;
+      pickSide.value = getComputedStyle(ROOT).getPropertyValue(VARS.sidebar).trim() || MASTERBALL.sidebar;
+      pickWork.value = getComputedStyle(ROOT).getPropertyValue(VARS.work).trim() || MASTERBALL.work;
+      hexTop.value = pickTop.value; hexSide.value = pickSide.value; hexWork.value = pickWork.value;
+    }
+    function isHex(v){ return /^#([0-9A-F]{6})$/i.test(v); }
+    function wirePicker(pick, hex, area){
+      pick.addEventListener('input', e=>{ setVar(area, e.target.value.toUpperCase()); hex.value = e.target.value.toUpperCase(); });
+      hex.addEventListener('input', e=>{ const v=e.target.value.trim().toUpperCase(); if(isHex(v)){ setVar(area, v); pick.value=v; } });
+    }
+    if (themeBtn && themeDropdown){
+      themeBtn.addEventListener('click', ()=> themeDropdown.classList.toggle('open'));
+      document.addEventListener('click', e=>{ if (!themeDropdown.contains(e.target) && e.target!==themeBtn) themeDropdown.classList.remove('open'); });
+    }
+    applyMaster();
+    ['topbar','sidebar','work'].forEach(a => { const v=getVar(a); if (v && isHex(v)) ROOT.style.setProperty(VARS[a], v); });
+    syncPickers();
+    if (applyMasterball) applyMasterball.addEventListener('click', applyMaster);
+    wirePicker(pickTop, hexTop, 'topbar');
+    wirePicker(pickSide, hexSide, 'sidebar');
+    wirePicker(pickWork, hexWork, 'work');
+    resetTheme.addEventListener('click', applyMaster);
+
+    // NON-BLOCKING ASSETS MODAL
+    async function maybePromptAssets(){
+      try {
+        const s = await window.AppAPI.assetsStatus();
+        if (!s || !s.ok) return;
+        if (!s.hasValidRoot){
+          assetsModal.classList.add('open');
+        }
+      } catch {}
+    }
+    btnOkAssets.addEventListener('click', async ()=>{
+      const r = await window.AppAPI.assetsChooseRoot();
+      if (r && r.ok){ assetsModal.classList.remove('open'); setStatus('Assets folder set.'); }
+    });
+    btnCancelAssets.addEventListener('click', async ()=>{
+      const r = await window.AppAPI.assetsUseDefault();
+      if (r && r.ok){ assetsModal.classList.remove('open'); setStatus('Using default assets folder.'); }
+    });
+
     window.addEventListener('DOMContentLoaded', () => {
       try {
         if (!window.AppAPI) throw new Error('Preload AppAPI not available');
         refreshList();
         showEmpty();
+        maybePromptAssets();
       } catch (e) {
         console.error('[init] failed:', e);
         const warn = document.createElement('div');
