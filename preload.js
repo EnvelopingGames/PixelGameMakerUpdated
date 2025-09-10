@@ -1,6 +1,6 @@
 /**
- * PixelGameMaker – preload.js (v0.5.1 patched)
- * Exposes Assets, Modules, and minimal UpdateAPI to the renderer expected by index.html.
+ * PixelGameMaker – preload.js (v0.5.3)
+ * Adds assetsStatus/assetsUseDefault for non-blocking modal.
  */
 const { contextBridge, ipcRenderer } = require("electron");
 const invoke = (ch, ...args) => ipcRenderer.invoke(ch, ...args);
@@ -22,6 +22,8 @@ const Assets = {
   move: (fromRel, toRel) => invoke("assets:move", fromRel, toRel),
   duplicate: (rel) => invoke("assets:duplicate", rel),
   delete: (rel) => invoke("assets:delete", rel),
+  status: () => invoke("assets:status"),
+  useDefault: () => invoke("assets:useDefault"),
 };
 
 // Modules
@@ -42,7 +44,7 @@ const Updates = {
   clear: () => invoke("updates:clear"),
 };
 
-// Unified API expected by index.html
+// Unified API for renderer
 const AppAPI = {
   // Assets
   assetsOpenFolder: () => Assets.openFolder(),
@@ -60,6 +62,8 @@ const AppAPI = {
   assetsMove: (fromRel, toRel) => Assets.move(fromRel, toRel),
   assetsDuplicate: (rel) => Assets.duplicate(rel),
   assetsDelete: (rel) => Assets.delete(rel),
+  assetsStatus: () => Assets.status(),
+  assetsUseDefault: () => Assets.useDefault(),
   // Modules
   addModuleViaPicker: () => Modules.addViaPicker(),
   listModules: () => Modules.list(),
