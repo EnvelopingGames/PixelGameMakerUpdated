@@ -183,10 +183,10 @@ function getAssetsRoot() {
 }
 
 ipcMain.handle('assets:status', async () => {
-  const root = getAssetsRoot();
-  const ok = fs.existsSync(root);
-  return { ok: true, hasValidRoot: !!ok, root };
+  const root = getAssetsRoot(); // keep using your existing resolver
+  return { ok: true, hasValidRoot: false, root };
 });
+
 
 ipcMain.handle('assets:chooseRoot', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {
