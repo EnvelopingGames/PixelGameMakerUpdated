@@ -1,6 +1,6 @@
 {
   "name": "pixel-game-maker",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Pixel Game Maker \u2014 portable, versioned updates, modules, assets.",
   "main": "main.js",
@@ -27,20 +27,12 @@
       "index.html",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "data",
-        "to": "data",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "win": {
       "target": [
         "portable"
       ],
       "artifactName": "PixelGameMaker-Portable-${version}.exe"
     }
-  }
+  },
+  "author": "EnvelopedGames"
 }
