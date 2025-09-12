@@ -365,6 +365,42 @@ ipcMain.handle('assets:delete', async (_e, rel) => {
   } catch (e) { return { ok: false, message: String(e && e.message || e) }; }
 });
 
+// --- Added: Assets Picker (durable) ---
+ipcMain.handle('assets:pick', async (_e, opts) => {
+  try {
+    const ROOT = getAssetsRoot();
+    const {
+      title = 'Choose Asset(s)',
+      properties = ['openFile'],
+      filters = [{ name: 'All files', extensions: ['*'] }],
+      defaultPath = ROOT
+    } = (opts || {});
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title,
+      defaultPath,
+      properties,   // e.g. ['openFile','multiSelections']
+      filters       // e.g. [{name:'Images', extensions:['png','jpg','jpeg','gif']}]
+    });
+
+    if (result.canceled) return { ok: false, canceled: true };
+
+    // Return *relative* paths under the portable assets root
+    const paths = (result.filePaths || [])
+      .map(abs => {
+        const rel = path.relative(ROOT, abs).split(path.sep).join('/');
+        return abs.startsWith(ROOT) ? rel : null;
+      })
+      .filter(Boolean);
+
+    return { ok: true, paths };
+  } catch (e) {
+    return { ok: false, message: String((e && e.message) || e) };
+  }
+});
+// --- End: Assets Picker ---
+
+
 // ---------- App lifecycle ----------
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
